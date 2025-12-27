@@ -163,7 +163,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 - ```db```. image=mysql:8. Контейнер должен работать в bridge-сети с названием ```backend``` и иметь фиксированный ipv4-адрес ```172.20.0.10```. Явно перезапуск сервиса в случае ошибок. Передайте необходимые ENV-переменные для создания: пароля root пользователя, создания базы данных, пользователя и пароля для web-приложения.Обязательно используйте уже существующий .env file для назначения секретных ENV-переменных!
 
-2. Запустите проект локально с помощью docker compose , добейтесь его стабильной работы: команда ```curl -L http://127.0.0.1:8090``` должна возвращать в качестве ответа время и локальный IP-адрес. Если сервисы не стартуют воспользуйтесь командами: ```docker ps -a ``` и ```docker logs <container_name>``` . Если вместо IP-адреса вы получаете информационную ошибку --убедитесь, что вы шлете запрос на порт ```8090```, а не 5000.
+4. Запустите проект локально с помощью docker compose , добейтесь его стабильной работы: команда ```curl -L http://127.0.0.1:8090``` должна возвращать в качестве ответа время и локальный IP-адрес. Если сервисы не стартуют воспользуйтесь командами: ```docker ps -a ``` и ```docker logs <container_name>``` . Если вместо IP-адреса вы получаете информационную ошибку --убедитесь, что вы шлете запрос на порт ```8090```, а не 5000.
 
 5. Подключитесь к БД mysql с помощью команды ```docker exec -ti <имя_контейнера> mysql -uroot -p<пароль root-пользователя>```(обратите внимание что между ключем -u и логином root нет пробела. это важно!!! тоже самое с паролем) . Введите последовательно команды (не забываем в конце символ ; ): ```show databases; use <имя вашей базы данных(по-умолчанию example)>; show tables; SELECT * from requests LIMIT 10;```.
 
@@ -171,23 +171,33 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
+1. Файл proxy.yaml определяет два сервиса (контейнера), которые работают вместе как прокси-слой:
+- reverse-proxy (HAProxy) — балансировщик нагрузки/обратный прокси внутри Docker-сети.
+- ingress-proxy (nginx) — внешний шлюз, входной (ingress) прокси, принимающий запросы снаружи (с хоста).
+- Сеть backend. Изолированная внутренняя сеть, в которой находятся reverse-proxy, web и db. К ней подключен и ingress-proxy (хоть он и в режиме host), чтобы "видеть" другие сервисы по их именам (например, web).
 
-<img src = "img/1-0.png" width = 60%> 
+2-3. Создаим файл compose.yaml.  
+4. Запустим проект.  
+`docker compose up -d`   
 
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
+<img src = "img/2-4-1.png" width = 60%> 
    
-3. Создадим публичный репозиторий  с именем "custom-nginx".
+Проверим работс приложения через curl.   
+`curl -L http://127.0.0.1:8090`
 
-<img src = "img/1-2.png" width = 60%> 
+<img src = "img/2-4-2.png" width = 60%> 
 
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
+5. Подключиvcz к БД mysql
+```
+docker exec -ti mysql-db mysql -uroot -pYtReWq4321 -e "
+show databases;
+use virtd;
+show tables;
+SELECT * FROM requests LIMIT 10;"
+```
+<img src = "img/3-5.png" width = 60%> 
 
-<img src = "img/1-3.png" width = 60%> 
-
+---
 
 
 ## Задача 4
@@ -200,23 +210,71 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
+1. Запустим в Yandex Cloud vm.
 
-<img src = "img/1-0.png" width = 60%> 
+<img src = "img/4-1.png" width = 60%> 
 
-2. Зарегистрируемся на Docker-Hub. 
+2. Подключимся к Вм по ssh и установим docker.   
+`ssh -i /home/yury/HW/terraform/04/secrets/yandex-cloud-key yury@158.160.119.226`
 
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
+<img src = "img/4-2-2.png" width = 60%>
 
-<img src = "img/1-2.png" width = 60%> 
+1. Напишем bash-скрип и разместим файл deploy.sh в директори /opt. 
+```
+#!/bin/bash
+set -e  # Выход при ошибке
 
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
+REPO_URL="https://github.com/YuryShelukhin/virt6.git"
+PROJECT_DIR="/opt/project"
 
-<img src = "img/1-3.png" width = 60%> 
+# 1. Клонируем репозиторий
+echo "Клонируем репозиторий..."
+sudo rm -rf "$PROJECT_DIR"
+sudo git clone "$REPO_URL" "$PROJECT_DIR"
+cd "$PROJECT_DIR"
 
+# 2. Запускаем проект
+echo "Запускаем Docker Compose..."
+sudo docker compose down 2>/dev/null || true
+sudo docker compose up -d --build
+
+echo "Готово! Проект запущен."
+```
+
+Создадим директорию /opt/project. Запустим скрипт.  
+`sudo sh deploy.sh`
+
+<img src = "img/4-3-1.png" width = 60%> 
+
+После отработки скрипта и клонирования репозитория, зайдем в директрию `project` и остановим docker compose. Затем создадим в этой директории файл с секретами и поменяем у него права.
+```
+sudo tee .env > /dev/null <<'EOF'
+MYSQL_ROOT_PASSWORD="YtReWq4321"
+MYSQL_DATABASE="virtd"
+MYSQL_USER="app"
+MYSQL_PASSWORD="QwErTy1234"
+EOF
+```
+`sudo chmod 600 .env`
+
+Перезапустим ВМ и вновь запустим docker compose.
+
+<img src = "img/4-3-2.png" width = 60%> 
+
+Проверим доступ к сервису с хоста.
+
+<img src = "img/4-3-3.png" width = 60%>
+
+Проверим http подключение.
+
+<img src = "img/4-3-4.png" width = 60%> 
+
+Проверим данные БД.
+
+<img src = "img/4-3-5.png" width = 60%> 
+
+
+Остальные задания в работе.
 
 
 ## Задача 5 (*)
@@ -227,22 +285,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
 
-<img src = "img/1-0.png" width = 60%> 
-
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
-
-<img src = "img/1-2.png" width = 60%> 
-
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
-
-<img src = "img/1-3.png" width = 60%> 
 
 
 
@@ -252,22 +295,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
 
-<img src = "img/1-0.png" width = 60%> 
-
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
-
-<img src = "img/1-2.png" width = 60%> 
-
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
-
-<img src = "img/1-3.png" width = 60%> 
 
 
 
@@ -277,22 +305,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
 
-<img src = "img/1-0.png" width = 60%> 
-
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
-
-<img src = "img/1-2.png" width = 60%> 
-
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
-
-<img src = "img/1-3.png" width = 60%> 
 
 
 
@@ -302,22 +315,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
 
-<img src = "img/1-0.png" width = 60%> 
-
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
-
-<img src = "img/1-2.png" width = 60%> 
-
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
-
-<img src = "img/1-3.png" width = 60%> 
 
 
 ## Задача 7 (***)
@@ -329,37 +327,6 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 **Решение**
 
-1. Установим необходимое ПО.
-
-<img src = "img/1-0.png" width = 60%> 
-
-2. Зарегистрируемся на Docker-Hub. 
-
-<img src = "img/1-1.png" width = 60%> 
-   
-3. Создадим публичный репозиторий  с именем "custom-nginx".
-
-<img src = "img/1-2.png" width = 60%> 
-
-4. Скачаем образ nginx:1.29.0.  
-`docker pull nginx:1.29.0`
-
-<img src = "img/1-3.png" width = 60%> 
-
-5. Создадим Dockerfile и реализуем в нем замену дефолтной индекс-страницы (/usr/share/nginx/html/index.html), на файл index.html.
-
-<img src = "img/1-4.png" width = 60%> 
-
-6. Соберем  созданный образ c tag 1.0.0.    
-`docker build -t custom-nginx:1.0.0 .`
-
-<img src = "img/1-5.png" width = 60%> 
-
-Запустим контейнер для проверки работоспособности.  
-`docker run -d -p 8080:80 --name custom-nginx custom-nginx:1.0.0`
-
-
-[ссылка на репозиторий](https://hub.docker.com/repositories/yyuuyyuu/custom-nginx/general)
 
 ---
 
