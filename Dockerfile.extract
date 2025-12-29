@@ -1,0 +1,16 @@
+# Dockerfile.extract
+
+FROM hashicorp/terraform:latest as source
+
+# Второй этап - минимальный образ для копирования файла
+FROM alpine:latest as extractor
+
+# Копируем ТОЛЬКО нужный файл из первого этапа
+COPY --from=source /bin/terraform /extracted/terraform/
+
+# Устанавливаем права
+RUN chmod +x /extracted/terraform/terraform
+
+# Оставляем файл в слое
+FROM scratch
+COPY --from=extractor /extracted/terraform/terraform /

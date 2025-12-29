@@ -273,8 +273,7 @@ EOF
 
 <img src = "img/4-3-5.png" width = 60%> 
 
-
-Остальные задания в работе.
+---
 
 
 ## Задача 5 (*)
@@ -285,8 +284,55 @@ EOF
 
 **Решение**
 
+1. Зайдем на ВМ и создадим директорию для бекапа.  
+`ssh -i /home/yury/HW/terraform/04/secrets/yandex-cloud-key yury@89.169.129.114`  
+`mkdir /opt/backup`
 
+Напишем bash-скрип mysql_backup.sh и разместим в директори /opt/backup.   
+`sudo vim mysql_backup.sh`
+```
+#!/bin/bash
 
+BACKUP_DIR="/opt/backup"
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="${BACKUP_DIR}/backup_$(date +%H%M).sql"
+
+docker exec mysql-db mysqldump -u root -pYtReWq4321 virtd > "$BACKUP_FILE"
+
+if [ -s "$BACKUP_FILE" ]; then
+    echo "Бэкап создан: $BACKUP_FILE"
+    echo "   Размер: $(du -h "$BACKUP_FILE" | cut -f1)"
+    chown yury:yury "$BACKUP_FILE"
+else
+    echo "Ошибка при создании бэкапа"
+    exit 1
+fi
+```
+Сделаем права на выполнение скрипта.    
+`sudo chmod +x mysql_backup.sh`  
+
+Назначим права на запись в директорию.  
+`sudo chmod 777 /opt/backup`  
+
+Выполним скрипт вручную.  
+`./mysql_backup.sh`  
+
+<img src = "img/5-0.png" width = 60%>
+
+Настраиваем crontab.  
+`crontab -e`
+
+Добавим текст.
+```
+# MySQL backup every minute
+* * * * * /opt/backup/mysql_backup.sh
+```
+
+Проверим результат.
+
+<img src = "img/5-1.png" width = 60%>
+
+---
 
 
 ## Задача 6
@@ -295,8 +341,38 @@ EOF
 
 **Решение**
 
+Скачаем образ.   
+`docker pull hashicorp/terraform:latest`
 
+<img src = "img/6-1.png" width = 60%> 
 
+Установим Dive.   
+`snap install dive`
+
+<img src = "img/6-2-0.png" width = 60%> 
+
+Так как dive установлен через snap, настроим его подключение к docker.    
+`sudo snap connect dive:docker-executables docker:docker-executables`    
+`sudo snap connect dive:docker-daemon docker:docker-daemon`  
+
+Исследуем образ.    
+`dive hashicorp/terraform:lates`    
+
+<img src = "img/6-3.png" width = 60%>  
+
+Сохраняем образ в tar-архив.  
+`docker save hashicorp/terraform:latest -o terraform-image.tar`  
+
+Распаковываем архив.  
+`mkdir terraform-extract`  
+`cd terraform-extract`  
+`tar -xf ../terraform-image.tar`  
+
+После распаковки ищем (долго) слой, содержащий /bin/  terraform.  
+
+<img src = "img/6-4.png" width = 50%>  
+
+---
 
 
 ## Задача 6.1
@@ -305,28 +381,49 @@ EOF
 
 **Решение**
 
+Создаем временный контейнер из образа.  
+`docker create --name temp-terraform hashicorp/terraform:latest`  
 
+Копируем файл /bin/terraform на локальную машину.  
+`docker cp temp-terraform:/bin/terraform ./terraform`  
 
+Удаляем временный контейнер.  
+`docker rm temp-terraform`  
 
+Проверяем, что файл скопировался.  
+`ls -la ./terraform`  
+`file ./terraform`  
+
+<img src = "img/6-1-1.png" width = 50%>  
+
+---
 
 ## Задача 6.2 (**)
+
 Предложите способ извлечь файл из контейнера, используя только команду docker build и любой Dockerfile.  
 Предоставьте скриншоты  действий .
 
 **Решение**
 
+Создадим файл Dockerfile.extract в корне проекта. Собираем образ.  
+`docker build -t terraform-extracted -f Dockerfile.extract .`  
+
+Создаем временный контейнер и копируем файл.  
+`docker create --name temp-extract --entrypoint /bin/sh terraform-extracted`  
+`docker cp temp-extract:/terraform ./terraform-extracted`  
+`docker rm temp-extract`  
+
+Проверяем.  
+`ls -la ./terraform-from-build`  
+
+<img src = "img/6-2.png" width = 50%>
 
 
+---
 
 ## Задача 7 (***)
 Запустите ваше python-приложение с помощью runC, не используя docker или containerd.  
 Предоставьте скриншоты  действий .
-
-
-
-
-**Решение**
-
 
 ---
 
