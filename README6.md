@@ -69,7 +69,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
 
 <img src = "img/1-2-1.png" width = 60%> 
 
-Запустим контейнер, проверим логи и состочние.  
+Запустим контейнер, проверим логи и состояние.  
 `docker run -d -p 5000:5000 --name fastapi-test my-fastapi-app`  
 `docker logs fastapi-test`  
 `docker ps`  
@@ -84,8 +84,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
 `pip install virtualenv --break-system-packages`  
 
 Создадим виртуальное окружение.       
-`/home/yury/.local/bin/virtualenv venv`    
-Установим зависимостb через активированное venv
+`/home/yury/.local/bin/virtualenv venv` 
+
+Установим зависимости через активированное venv. 
 `bash -c "source venv/bin/activate && pip install -r requirements.txt"`  
 
 Запустим mysql в контейнере.
@@ -176,18 +177,18 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 - ingress-proxy (nginx) — внешний шлюз, входной (ingress) прокси, принимающий запросы снаружи (с хоста).
 - Сеть backend. Изолированная внутренняя сеть, в которой находятся reverse-proxy, web и db. К ней подключен и ingress-proxy (хоть он и в режиме host), чтобы "видеть" другие сервисы по их именам (например, web).
 
-2-3. Создаим файл compose.yaml.  
+2-3. Создадим файл compose.yaml.  
 4. Запустим проект.  
 `docker compose up -d`   
 
 <img src = "img/2-4-1.png" width = 60%> 
    
-Проверим работс приложения через curl.   
+Проверим работу приложения через curl.   
 `curl -L http://127.0.0.1:8090`
 
 <img src = "img/2-4-2.png" width = 60%> 
 
-5. Подключиvcz к БД mysql
+5. Подключиvcz к БД mysql.  
 ```
 docker exec -ti mysql-db mysql -uroot -pYtReWq4321 -e "
 show databases;
@@ -210,7 +211,7 @@ SELECT * FROM requests LIMIT 10;"
 
 **Решение**
 
-1. Запустим в Yandex Cloud vm.
+1. Запустим в Yandex Cloud ВМ.
 
 <img src = "img/4-1.png" width = 60%> 
 
@@ -219,7 +220,7 @@ SELECT * FROM requests LIMIT 10;"
 
 <img src = "img/4-2-2.png" width = 60%>
 
-1. Напишем bash-скрип и разместим файл deploy.sh в директори /opt. 
+1. Напишем bash-скрип и разместим файл `deploy.sh` в директории `/opt`.   
 ```
 #!/bin/bash
 set -e  # Выход при ошибке
@@ -284,11 +285,11 @@ EOF
 
 **Решение**
 
-1. Зайдем на ВМ и создадим директорию для бекапа.  
+1. Зайдем на ВМ и создадим директорию для бекапа.  IP поменялся после прерывания ВМ.  
 `ssh -i /home/yury/HW/terraform/04/secrets/yandex-cloud-key yury@89.169.129.114`  
 `mkdir /opt/backup`
 
-Напишем bash-скрип mysql_backup.sh и разместим в директори /opt/backup.   
+Напишем bash-скрип mysql_backup.sh и разместим в директории /opt/backup.   
 `sudo vim mysql_backup.sh`
 ```
 #!/bin/bash
